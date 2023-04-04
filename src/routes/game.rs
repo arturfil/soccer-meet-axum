@@ -15,7 +15,7 @@ pub async fn get_games(
 
     let query_result = sqlx::query_as!(
         GameModel,
-        "SELECT * FROM games ORDER BY id LIMIT $1 OFFSET $2",
+        "SELECT id, day, field_name, address, created_at, updated_at FROM games LIMIT $1 OFFSET $2",
         limit as i32,
         offset as i32,
     )
@@ -45,7 +45,7 @@ pub async fn create_game(
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     let query_result = sqlx::query_as!(
         GameModel,
-        "INSERT INTO games (field_name, address, day) VALUES ($1, $2, $3) RETURNING *",
+        "INSERT INTO games (field_name, address, day) VALUES ($1, $2, $3) RETURNING id, day, field_name, address, created_at, updated_at",
         body.field_name.to_string(),
         body.address.to_string(),
         body.day.to_string()
@@ -81,7 +81,7 @@ pub async fn get_game_by_id(Path(id): Path<uuid::Uuid>, State(data): State<Arc<A
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     let query_result = sqlx::query_as!(
         GameModel,
-        "SELECT * FROM games WHERE id = $1",
+        "SELECT id, day, field_name, address, created_at, updated_at FROM games WHERE id = $1",
         id
     )
         .fetch_one(&data.db)
@@ -114,7 +114,7 @@ pub async fn update_game(
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     let query_result = sqlx::query_as!(
         GameModel,
-        "SELECT * FROM games WHERE id = $1",
+        "SELECT id, day, field_name, address, created_at, updated_at FROM games WHERE id = $1",
         id
     )
         .fetch_one(&data.db).await;
@@ -132,7 +132,7 @@ pub async fn update_game(
 
     let query_result = sqlx::query_as!(
         GameModel,
-        "UPDATE games set field_name = $1, address = $2, day = $3, updated_at = $4 WHERE id = $5 RETURNING *",
+        "UPDATE games set field_name = $1, address = $2, day = $3, updated_at = $4 WHERE id = $5 RETURNING id, day, field_name, address, created_at, updated_at",
         body.field_name.to_owned().unwrap_or(game.field_name),
         body.address.to_owned().unwrap_or(game.address),
         body.day.to_owned().unwrap_or(game.day),
