@@ -8,6 +8,7 @@ use routes::router::create_router;
 
 mod models;
 mod routes;
+mod services;
 
 pub struct AppState {
     db: Pool<Postgres>

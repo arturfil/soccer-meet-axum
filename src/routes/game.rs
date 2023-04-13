@@ -1,28 +1,17 @@
 use std::sync::Arc;
 use axum::{response::IntoResponse, extract::{State, Query, Path}, http::StatusCode, Json};
 use serde_json::json;
-use crate::{models::{dtos::{FilterOptions, CreateGameSchema, UpdateGameSchema}, game::GameModel}, AppState};
+use crate::{models::{dtos::{FilterOptions, CreateGameSchema, UpdateGameSchema}, game::GameModel}, AppState, services::game::{get_games_svc, create_game_service, get_game_by_id_service, update_game_service, delete_game_service}}; 
 
 
 pub async fn get_games(
-    opts: Option<Query<FilterOptions>>,
-    State(data): State<Arc<AppState>>
+        opts: Option<Query<FilterOptions>>,
+        State(data): State<Arc<AppState>>
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    let Query(opts) = opts.unwrap_or_default();
-
-    let limit = opts.limit.unwrap_or(10);
-    let offset = (opts.page.unwrap_or(1) - 1) * limit;
-
-    let query_result = sqlx::query_as!(
-        GameModel,
-        "SELECT id, day, field_name, address, created_at, updated_at FROM games LIMIT $1 OFFSET $2",
-        limit as i32,
-        offset as i32,
-    )
-    .fetch_all(&data.db)
-    .await;
-
-    if query_result.is_err() {
+    
+    // await for the respo service return with the sql query 
+    let query_result = get_games_svc(opts, State(data)).await;
+    if query_result.is_err() {  // error handling
         let err_response = serde_json::json!({
             "status": "fail",
             "message": "Something wrong happened.",
@@ -40,20 +29,13 @@ pub async fn get_games(
 }
 
 pub async fn create_game(
-    State(data): State<Arc<AppState>>,
-    Json(body): Json<CreateGameSchema>,
+        State(data): State<Arc<AppState>>,
+        Json(body): Json<CreateGameSchema>
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    let query_result = sqlx::query_as!(
-        GameModel,
-        "INSERT INTO games (field_name, address, day) VALUES ($1, $2, $3) RETURNING id, day, field_name, address, created_at, updated_at",
-        body.field_name.to_string(),
-        body.address.to_string(),
-        body.day.to_string()
-    )
-    .fetch_one(&data.db)
-    .await;
 
-    match query_result {
+    let query_result = create_game_service(State(data), Json(body));
+
+    match query_result.await {
         Ok(game) => {
             let game_response = json!({"status": "success", "data": json!({
                 "game": game
@@ -77,21 +59,18 @@ pub async fn create_game(
     }
 }
 
-pub async fn get_game_by_id(Path(id): Path<uuid::Uuid>, State(data): State<Arc<AppState>>,
+pub async fn get_game_by_id(
+    Path(id): Path<uuid::Uuid>, 
+    State(data): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    let query_result = sqlx::query_as!(
-        GameModel,
-        "SELECT id, day, field_name, address, created_at, updated_at FROM games WHERE id = $1",
-        id
-    )
-        .fetch_one(&data.db)
-        .await;
-
-    match query_result {
+    
+    let query_result = get_game_by_id_service(Path(id), State(&data));
+    
+    match query_result.await {
         Ok(game) => {
             let game_response = serde_json::json!({
-                "status": "success",
-                "data": serde_json::json!({
+                    "status": "success",
+                    "data": serde_json::json!({
                     "game": game
                 })
             });
@@ -112,13 +91,8 @@ pub async fn update_game(
     State(data): State<Arc<AppState>>,
     Json(body): Json<UpdateGameSchema>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    let query_result = sqlx::query_as!(
-        GameModel,
-        "SELECT id, day, field_name, address, created_at, updated_at FROM games WHERE id = $1",
-        id
-    )
-        .fetch_one(&data.db).await;
-
+    
+    let query_result = get_game_by_id_service(Path(id), State(&data)).await;
     if query_result.is_err() {
         let error_response = serde_json::json!({
             "status": "fail",
@@ -126,20 +100,9 @@ pub async fn update_game(
         });
         return Err((StatusCode::NOT_FOUND, Json(error_response)));
     }
-
-    let now = chrono::Utc::now();
+    
     let game = query_result.unwrap();
-
-    let query_result = sqlx::query_as!(
-        GameModel,
-        "UPDATE games set field_name = $1, address = $2, day = $3, updated_at = $4 WHERE id = $5 RETURNING id, day, field_name, address, created_at, updated_at",
-        body.field_name.to_owned().unwrap_or(game.field_name),
-        body.address.to_owned().unwrap_or(game.address),
-        body.day.to_owned().unwrap_or(game.day),
-        now,
-        id 
-    )
-        .fetch_one(&data.db).await;
+    let query_result = update_game_service(Path(id), State(&data), Json(body), game).await;
 
     match query_result {
         Ok(game) => {
@@ -157,10 +120,12 @@ pub async fn update_game(
     }
 }
 
-pub async fn delete_game(Path(id): Path<uuid::Uuid>, State(data): State<Arc<AppState>>,
+pub async fn delete_game(
+    Path(id): Path<uuid::Uuid>, 
+    State(data): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    let rows_affected = sqlx::query!("DELETE FROM games WHERE id = $1", id)
-        .execute(&data.db)
+    let rows_affected = delete_game_service(Path(id), State(&data))
+        .await.execute(&data.db)
         .await.unwrap().rows_affected();
 
     if rows_affected == 0 {

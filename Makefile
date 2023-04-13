@@ -45,7 +45,7 @@ stop_containers:
 		echo "no active containers found..."; \
 	fi
 
-run:
+run: start_docker_db
 	cargo run
 watch: 
 	cargo watch -x run
