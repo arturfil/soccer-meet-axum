@@ -1,4 +1,5 @@
 DB_DOCKER_CONTAINER=axum_soccer_container
+DB_NAME=axum_soccer_db
 
 install:
 	cargo add axum
@@ -31,7 +32,9 @@ create_docker_container:
 	docker run --name ${DB_DOCKER_CONTAINER} -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -d postgres:12-alpine
 
 create_postgres_db:
-	docker exec -it ${DB_DOCKER_CONTAINER} createdb --username=root --owner=root axum_soccer_db
+	docker exec -it ${DB_DOCKER_CONTAINER} createdb --username=root --owner=root ${DB_NAME}
+
+setup_docker_env: create_docker_container create_postgres_db migrate-up
 
 start_docker_db:
 	docker start ${DB_DOCKER_CONTAINER}

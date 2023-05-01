@@ -1,11 +1,9 @@
-use crate::AppState;
+use crate::{AppState, controllers::game::{get_games, get_game_by_id, update_game, delete_game, create_game}};
 use axum::{
     routing::{get, post},
     Router,
 };
 use std::sync::Arc;
-
-use crate::routes::game::{create_game, delete_game, get_game_by_id, get_games, update_game};
 
 pub fn create_router(app_state: Arc<AppState>) -> Router {
     Router::new()

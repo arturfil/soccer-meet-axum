@@ -4,10 +4,11 @@ use axum::http::{HeaderValue, Method, header::{AUTHORIZATION, ACCEPT, CONTENT_TY
 use dotenv::dotenv;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use tower_http::cors::CorsLayer;
-use routes::router::create_router;
+use crate::router::router::create_router;
 
 mod models;
-mod routes;
+mod controllers;
+mod router;
 mod services;
 
 pub struct AppState {
